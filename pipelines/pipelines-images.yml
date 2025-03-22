@@ -9,25 +9,30 @@ trigger:
 pool:
   vmImage: ubuntu-latest
 
+variables:
+  imageFilePath: 'images/images-list.txt'
+  trivyFailOnVulns: true # Cambia a false si quieres solo advertencias
+
 steps:
 - task: Bash@3
-  displayName: 'Leer imágenes Docker'
+  displayName: 'Leer imágenes Docker y escanear con Trivy'
   inputs:
     targetType: 'inline'
     script: |
+      set -e # Detiene el script si un comando falla
       while IFS= read -r image; do
         echo "Procesando imagen: $image"
-        # Escaneo de vulnerabilidades con Trivy
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --exit-code 0 $image > trivy_results.txt
-        # Verifica si Trivy encontró vulnerabilidades
-        if grep -q "Vulnerability ID" trivy_results.txt; then
-          echo "Se encontraron vulnerabilidades en $image"
-          exit 1 # Marca el paso como fallido
-        else
+        # Escanea la imagen con Trivy
+        trivy image --exit-code 1 $image
+        if [ $? -eq 0 ]; then
           echo "No se encontraron vulnerabilidades en $image"
-          # Ejecuta docker pull solo si no hay vulnerabilidades
           docker pull $image
+        else
+          echo "Se encontraron vulnerabilidades en $image"
+          if [[ "${trivyFailOnVulns}" == "true" ]]; then
+            exit 1 # Marca el paso como fallido
+          fi
         fi
-      done < images/images-list.txt # ruta al archivo images-list.txt
+      done < $(imageFilePath)
 
 
