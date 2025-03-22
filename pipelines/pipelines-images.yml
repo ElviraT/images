@@ -4,16 +4,30 @@
 # https://aka.ms/yaml
 
 trigger:
-- none
+- main
 
 pool:
   vmImage: ubuntu-latest
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+- task: Bash@3
+  displayName: 'Leer imágenes Docker'
+  inputs:
+    targetType: 'inline'
+    script: |
+      while IFS= read -r image; do
+        echo "Procesando imagen: $image"
+        # Escaneo de vulnerabilidades con Trivy
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --exit-code 0 $image > trivy_results.txt
+        # Verifica si Trivy encontró vulnerabilidades
+        if grep -q "Vulnerability ID" trivy_results.txt; then
+          echo "Se encontraron vulnerabilidades en $image"
+          exit 1 # Marca el paso como fallido
+        else
+          echo "No se encontraron vulnerabilidades en $image"
+          # Ejecuta docker pull solo si no hay vulnerabilidades
+          docker pull $image
+        fi
+      done < images/images-list.txt # ruta al archivo images-list.txt
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+
