@@ -1,4 +1,4 @@
-nginx:latest # imagen de Docker para el servidor web Nginx
+nginx:latest # imagen de Docker para el servidor web
 postgres:latest #imagen de Docker para PostgreSQL, un sistema de gestión de bases de datos relacional de código abierto.
 mysql:9.2.0 #imagen de Docker para el sistema de gestión de bases de datos MySQL.
 httpd:2.4.63 #imagen de Docker para el servidor web Apache HTTP Server.
