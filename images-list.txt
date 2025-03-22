@@ -1,0 +1,10 @@
+nginx:latest # imagen de Docker para el servidor web Nginx
+postgres:latest #imagen de Docker para PostgreSQL, un sistema de gestión de bases de datos relacional de código abierto.
+mysql:9.2.0 #imagen de Docker para el sistema de gestión de bases de datos MySQL.
+httpd:2.4.63 #imagen de Docker para el servidor web Apache HTTP Server.
+node:23-alpine # imagen de Docker para Node.js, un entorno de ejecución de JavaScript del lado del servidor.
+python:3.9 # imagen de Docker para el lenguaje de programación Python.
+alpine:3.15 #imagen base de Alpine Linux.
+jenkins/jenkins:lts #imagen de Docker para Jenkins, un servidor de automatización de código abierto utilizado para la integración y entrega continua (CI/CD).
+gitlab/gitlab-ce:latestla # imagen de Docker para GitLab Community Edition, una plataforma de gestión de repositorios Git con funciones de CI/CD.
+grafana/grafana:latest #imagen de Docker para Grafana, una herramienta de visualización de datos.
