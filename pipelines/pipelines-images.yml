@@ -1,0 +1,41 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  - main
+
+pool:
+  vmImage: ubuntu-latest
+
+parameters:
+  - name: imageName
+    displayName: 'Nombre de la imagen Docker'
+    type: string
+    default: 'nginx:latest' # Imagen por defecto
+
+variables:
+  trivyFailOnVulns: true # Cambia a false si quieres solo advertencias
+
+stages:
+  - stage: Escaneo_y_Pull
+    jobs:
+      - job: Escanear_y_Descargar
+        steps:
+          - script: |
+              set -e # Detiene el script si un comando falla
+              image="${{ parameters.imageName }}"
+              echo "Procesando imagen: $image"
+              # Escanea la imagen con Trivy
+              docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --exit-code 1 $image
+              if [ $? -eq 0 ]; then
+                echo "No se encontraron vulnerabilidades en $image"
+                docker pull $image
+              else
+                echo "Se encontraron vulnerabilidades en $image"
+                if [[ "${trivyFailOnVulns}" == "true" ]]; then
+                  exit 1 # Marca el paso como fallido
+                fi
+              fi
+            displayName: 'Escanear y descargar imagen Docker'
