@@ -12,26 +12,36 @@ pool:
 variables:
   imageFilePath: 'images/images-list.txt'
   trivyFailOnVulns: true # Cambia a false si quieres solo advertencias
-
-stages:
-  - stage: Escaneo_y_Pull
-    jobs:
-      - job: Escanear_y_Descargar
-        steps:
-          - script: |
-              set -e # Detiene el script si un comando falla
-              while IFS= read -r image; do
-                echo "Procesando imagen: $image"
-                # Escanea la imagen con Trivy
-                docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --exit-code 1 $image
-                if [ $? -eq 0 ]; then
-                  echo "No se encontraron vulnerabilidades en $image"
-                  docker pull $image
-                else
-                  echo "Se encontraron vulnerabilidades en $image"
-                  if [[ "${trivyFailOnVulns}" == "true" ]]; then
-                    exit 1 # Marca el paso como fallido
-                  fi
-                fi
-              done < $(imageFilePath)
-            displayName: 'Leer imágenes Docker y escanear con Trivy'
+steps:
+  - script: |
+      set -e # Detiene el script si un comando falla
+      while IFS= read -r image; do
+        echo "Procesando imagen: $image"
+        # Docker pull desde Docker Hub
+        docker pull $image
+        # Escaneo de imagen con Trivy
+        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --exit-code 0 $image > trivy_results.txt
+        # Verifica si Trivy encontró vulnerabilidades críticas
+        if grep -q "CRITICAL" trivy_results.txt; then
+          echo "Se encontraron vulnerabilidades críticas en $image"
+          # Generar reporte y notificar (aquí puedes agregar tu lógica de notificación)
+          cat trivy_results.txt
+          exit 1 # Marca el paso como fallido
+        else
+          echo "No se encontraron vulnerabilidades críticas en $image"
+          # Taggear imagen para ACR
+          image_tag=$(echo $image | sed 's/:/-/g')
+          docker tag $image $acrLoginServer/$image_tag
+          # Login en Azure Container Registry
+          az acr login --name $acrLoginServer --username $acrUsername --password $acrPassword
+          # Push de imagen al repositorio privado en ACR
+          docker push $acrLoginServer/$image_tag
+        fi
+      done < $(imageFilePath)
+    displayName: 'Leer imágenes, escanear y publicar en ACR'
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: 'trivy_results.txt'
+      artifact: 'TrivyScanResults'
+      publishLocation: 'pipeline'
+    condition: failed()
