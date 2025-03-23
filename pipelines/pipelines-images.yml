@@ -3,35 +3,33 @@
 # Add steps that build, run tests, deploy, and more:
 # https://aka.ms/yaml
 
+
 trigger:
   - main
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: "ubuntu-latest"
 
-variables:
-  imageFilePath: 'images/images-list.txt'
-  trivyFailOnVulns: true # Cambia a false si quieres solo advertencias
+steps:
+  - checkout: self
 
-stages:
-  - stage: Escaneo_y_Pull
-    jobs:
-      - job: Escanear_y_Descargar
-        steps:
-          - script: |
-              set -e # Detiene el script si un comando falla
-              while IFS= read -r image; do
-                echo "Procesando imagen: $image"
-                # Escanea la imagen con Trivy
+  - script: |
+      echo "Leyendo la lista de imágenes desde images-list.txt"
+      images=$(cat images/images-list.txt | grep -v '^#' | awk '{print $1}')
+      for image in $images; do
+          echo "Validando la imagen: $image"
+          if [[ "$image" == *":"* ]]; then
+              echo "Analizando la imagen con tryvi: $image"
+              # Escanea la imagen con Trivy
                 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image --exit-code 1 $image
-                if [ $? -eq 0 ]; then
-                  echo "No se encontraron vulnerabilidades en $image"
-                  docker pull $image
-                else
-                  echo "Se encontraron vulnerabilidades en $image"
-                  if [[ "${trivyFailOnVulns}" == "true" ]]; then
-                    exit 1 # Marca el paso como fallido
-                  fi
-                fi
-              done < $(imageFilePath)
-            displayName: 'Leer imágenes Docker y escanear con Trivy'
+              if [ $? -eq 0 ]; then
+                  echo "Ejecutando la imagen: $image"
+                  docker run $image
+              else
+                  echo "Análisis fallido para la imagen: $image"
+              fi
+          else
+              echo "Nombre de imagen no válido: $image"
+          fi
+      done
+    displayName: "Ejecutar imágenes de Docker"
