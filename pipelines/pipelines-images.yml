@@ -12,7 +12,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  dockerId: 'elvirateran' # Reemplaza con tu nombre de usuario de Docker Hub
+  dockerId: 'elvirateran'
 
 steps:
 - checkout: self
