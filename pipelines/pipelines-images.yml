@@ -6,60 +6,51 @@
 trigger:
   branches:
     include:
-      - main
+      - main # O la rama que estés utilizando
 
 pool:
-  vmImage: 'ubuntu-latest'
-
-variables:
-  dockerId: 'elvirateran'
-  imagesListFile: 'images/images-list.txt'
+  vmImage: 'ubuntu-latest' # O la imagen que prefieras
 
 steps:
-- checkout: self
+- task: GitVersion@5
+  displayName: 'Obtener versión de Git'
+  inputs:
+    versionSpec: '5.x'
 
 - task: Bash@3
-  displayName: 'Leer lista de imágenes y crear array IMAGES_ARRAY'
+  displayName: 'Leer lista de imágenes y procesarlas secuencialmente'
   inputs:
     targetType: 'inline'
     script: |
-      IMAGES=$(cat $(imagesListFile))
-      echo "##vso[task.setvariable variable=IMAGES_ARRAY]$IMAGES"
+      # Leer la lista de imágenes desde el archivo images-list.txt
+      while IFS= read -r image; do
+        echo "Procesando imagen: $image"
 
-- ${{ each image in split(variables.IMAGES_ARRAY, '\n') }}:
-  - task: Docker@2
-    displayName: 'Docker login'
-    inputs:
-      containerRegistry: 'dockerhub'
+        # Docker pull desde Docker Hub
+        docker pull "$image"
 
-  - task: Bash@3
-    displayName: 'Etiquetar y enviar imagen ${{ image }} a Docker Hub'
-    inputs:
-      targetType: 'inline'
-      script: |
-        echo "Procesando imagen: ${{ image }}"
-        docker tag ${{ image }} $(dockerId)/${{ image }}
-        docker push $(dockerId)/${{ image }}
-        sleep 10 # Espera 10 segundos
+        # Escaneo de imagen con Trivy
+        trivy image --exit-code 0 --severity CRITICAL "$image"
+        if [ $? -ne 0 ]; then
+          echo "Se encontraron vulnerabilidades críticas en $image"
+          # Generar reporte y notificar (puedes personalizar esto)
+          trivy image --format template --template "@/contrib/sarif.tpl" -o report.sarif "$image"
 
-  - task: Bash@3
-    displayName: 'Escaneo con Trivy de ${{ image }}'
-    inputs:
-      targetType: 'inline'
-      script: |
-        echo "Escaneando imagen: ${{ image }}"
-        trivy image --exit-code 0 --severity CRITICAL ${{ image }}
-        if [ $? -eq 0 ]; then
-          echo "No se encontraron vulnerabilidades críticas para ${{ image }}."
+          # Publicar reportes como artefactos
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publicar Reporte Trivy'
+            inputs:
+              targetPath: '$(System.DefaultWorkingDirectory)/report.sarif'
+              artifact: 'ReporteTrivy'
+
+          exit 1
         else
-          echo "Se encontraron vulnerabilidades críticas para ${{ image }}."
-          trivy image --format template --template "@/contrib/sarif.tpl" ${{ image }} > trivy-report-${{ image }}.sarif
-        fi
-        sleep 5 # Espera 5 segundos
+          echo "No se encontraron vulnerabilidades críticas en $image"
 
-  - task: PublishPipelineArtifact@1
-    displayName: 'Publicar artefacto Trivy Scan Report de ${{ image }}'
-    inputs:
-      targetPath: 'trivy-report-${{ image }}.sarif'
-      artifact: 'TrivyScanReport-${{ image }}'
-      publishLocation: 'pipeline'
+          # Taggear imagen para el registro local
+          docker tag "$image" "localhost:5000/$image:$(GitVersion.SemVer)"
+
+          # Push de imagen al registro local
+          docker push "localhost:5000/$image:$(GitVersion.SemVer)"
+        fi
+      done < images-list.txt
