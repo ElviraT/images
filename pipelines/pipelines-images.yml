@@ -55,4 +55,4 @@ steps:
           # Push de imagen al registro local
           docker push "localhost:5000/$image:$GIT_VERSION"
         fi
-      done < images-list.txt
+      done < images/images-list.txt
