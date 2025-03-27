@@ -8,9 +8,6 @@ trigger:
     include:
       - main # O la rama que estés utilizando
 
-pool:
-  vmImage: 'ubuntu-latest' # O la imagen que prefieras
-
 steps:
 - task: Bash@3
   displayName: 'Obtener versión de Git'
