@@ -13,7 +13,7 @@ pool:
 
 steps:
 - task: Bash@3
-  displayName: 'Obtener versión de Git y procesar imágenes'
+  displayName: 'Obtener versión de Git'
   inputs:
     targetType: 'inline'
     script: |
@@ -22,6 +22,11 @@ steps:
       echo "Versión de Git: $GIT_VERSION"
       echo "##vso[task.setvariable variable=GIT_VERSION]$GIT_VERSION"
 
+- task: Bash@3
+  displayName: 'Procesar imágenes secuencialmente'
+  inputs:
+    targetType: 'inline'
+    script: |
       # Leer la lista de imágenes y procesarlas secuencialmente
       while IFS= read -r image; do
         echo "Procesando imagen: $image"
