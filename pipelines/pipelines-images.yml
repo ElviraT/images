@@ -12,17 +12,17 @@ pool:
   vmImage: 'ubuntu-latest' # O la imagen que prefieras
 
 steps:
-- task: GitVersion@5
-  displayName: 'Obtener versión de Git'
-  inputs:
-    versionSpec: '5.x'
-
 - task: Bash@3
-  displayName: 'Leer lista de imágenes y procesarlas secuencialmente'
+  displayName: 'Obtener versión de Git y procesar imágenes'
   inputs:
     targetType: 'inline'
     script: |
-      # Leer la lista de imágenes desde el archivo images-list.txt
+      # Obtener la versión de Git usando git describe
+      GIT_VERSION=$(git describe --tags --abbrev=0 --exact-match 2>/dev/null || git describe --tags --abbrev=0)
+      echo "Versión de Git: $GIT_VERSION"
+      echo "##vso[task.setvariable variable=GIT_VERSION]$GIT_VERSION"
+
+      # Leer la lista de imágenes y procesarlas secuencialmente
       while IFS= read -r image; do
         echo "Procesando imagen: $image"
 
@@ -48,9 +48,9 @@ steps:
           echo "No se encontraron vulnerabilidades críticas en $image"
 
           # Taggear imagen para el registro local
-          docker tag "$image" "localhost:5000/$image:$(GitVersion.SemVer)"
+          docker tag "$image" "localhost:5000/$image:$GIT_VERSION"
 
           # Push de imagen al registro local
-          docker push "localhost:5000/$image:$(GitVersion.SemVer)"
+          docker push "localhost:5000/$image:$GIT_VERSION"
         fi
       done < images-list.txt
